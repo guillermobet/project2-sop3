@@ -1,44 +1,77 @@
-from multiprocessing import Process, Manager
-import sys
 import os
+import sys
 
-class Puzzle:
-	def __init__(self, matrix, diag, words, matches):
-		self.matrix = matrix
-		self.diag = diag
-		self.words = words
-		self.matches = matches
-
-	def __iter__(self):
-		return self
-
-	def __next__(self):
-		if self.matches['not found'] == 0 or len(diag) == 0:
-			raise StopIteration
-		return diag.pop()
+from operator import itemgetter
+from collections import Counter
+from multiprocessing import Process, Manager
 
 def pprint(matrix):
 	for row in matrix:
 		print(row)
 
+def column(m, i):
+	return list(map(itemgetter(i), m))
+
+def row_and_column(m, i):
+	ret = dict()
+	ret['row'] = m[i][:]
+	ret['column'] = column(m, i)
+	return ret
+
+def solver(rc, find, found):
+	found[os.getpid()] = []
+	for word in find:
+		freq = Counter(word)
+		row = Counter(rc['row'])
+		column = Counter(rc['column'])
+		in_row = True
+		in_column = True
+
+		for letter in freq.keys():
+			if letter in row.keys():
+				in_row = in_row and (freq[letter] <= row[letter])
+			else:
+				in_row = False
+
+			if letter in column.keys():
+				in_column = in_column and (freq[letter] <= column[letter])
+			else:
+				in_column = False
+
+		if (in_row or in_column):
+			found[os.getpid()] += [word]
+
+def word_counter(found):
+	s = set()
+	for process in found.keys():
+		for word in found[process]:
+			s.add(word)
+	return s
+
 if __name__ == '__main__':
 	with Manager() as manager:
-		with Pool(processes=sys.argv[1]) as pool:
-			size = int(input())
-			diag = manager.list(i for i in range(size))
-			matrix = []
-			for _ in range(size):
-				matrix.append(list(input()))
-			
-			matches = manager.dict([
-						('not found', []),
-						('found', [])
-						])
-			for _ in range(int(input())):
-				matches['not found'] += [input()]
+		size = int(input())
+		matrix = []
+		for _ in range(size):
+			matrix.append(list(input()))
+		
+		find = []
+		found = manager.dict()
 
-			puzzle = Puzzle(matrix, diag, words, matches)
-			pool.map(solver, puzzle)
+		for _ in range(int(input())):
+			find += [input()]
 
-			processes = [Process(target=solver, args=(puzzle,)) for i in range(sys.argv[1])]
+		processes = []
 
+		for position in range(size):
+			processes += [Process(target=solver, args=(row_and_column(matrix, position), find, found))]
+			processes[position].start()
+
+		for process in processes:
+			process.join()
+
+		w = word_counter(found)
+
+		print(len(w))
+		for word in w:
+			print(word)
