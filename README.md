@@ -1,4 +1,4 @@
-Install MPI
+Install MPI  
 	$ sudo apt install mpich  
 
 Create virtualenv (optional):  
