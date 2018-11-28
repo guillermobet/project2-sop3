@@ -9,4 +9,4 @@ Install requirements:
 	$ (env) pip3 install -r requirements.txt  
 
 Run code (add flags for running in cluster):  
-	$ (env) mpirun -n 4 python3 weird_puzzle.py
+	$ (env) mpirun -n 4 python3 weird_puzzle.py < test.in
