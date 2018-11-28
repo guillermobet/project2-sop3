@@ -1,77 +1,96 @@
+# mpirun -n 4 python3 mpi.py
+
 import os
 import sys
 
+from mpi4py import MPI
 from operator import itemgetter
 from collections import Counter
-from multiprocessing import Process, Manager
-
-def pprint(matrix):
-	for row in matrix:
-		print(row)
 
 def column(m, i):
 	return list(map(itemgetter(i), m))
 
-def row_and_column(m, i):
+def position_info(m, i, find):
 	ret = dict()
 	ret['row'] = m[i][:]
 	ret['column'] = column(m, i)
+	ret['find'] = find
+	ret['found'] = []
 	return ret
 
-def solver(rc, find, found):
-	found[os.getpid()] = []
-	for word in find:
-		freq = Counter(word)
-		row = Counter(rc['row'])
-		column = Counter(rc['column'])
-		in_row = True
-		in_column = True
+def data_preprocessing_root(size):
+	matrix_size = int(input())
+	matrix = []
+	for _ in range(matrix_size):
+		matrix.append(list(input()))
+	
+	find = []
+	for _ in range(int(input())):
+		find += [input()]
 
-		for letter in freq.keys():
-			if letter in row.keys():
-				in_row = in_row and (freq[letter] <= row[letter])
-			else:
-				in_row = False
+	unscatterable = [position_info(matrix, i, find) for i in range(matrix_size)]
+	scatterable = [[] for i in range(size)]
 
-			if letter in column.keys():
-				in_column = in_column and (freq[letter] <= column[letter])
-			else:
-				in_column = False
+	for index, position in enumerate(unscatterable):
+		scatterable[index % size].append(position)
 
-		if (in_row or in_column):
-			found[os.getpid()] += [word]
+	return scatterable
 
-def word_counter(found):
-	s = set()
-	for process in found.keys():
-		for word in found[process]:
-			s.add(word)
-	return s
-
-if __name__ == '__main__':
-	with Manager() as manager:
-		size = int(input())
-		matrix = []
-		for _ in range(size):
-			matrix.append(list(input()))
+def solver(scatterable):
+	for position in scatterable:
+		row = Counter(position['row'])
+		column = Counter(position['column'])
 		
-		find = []
-		found = manager.dict()
+		for word in position['find']:
+			freq = Counter(word)
+			in_row = True
+			in_column = True
 
-		for _ in range(int(input())):
-			find += [input()]
+			for letter in freq.keys():
+				if letter in row.keys():
+					in_row = in_row and (freq[letter] <= row[letter])
+				else:
+					in_row = False
 
-		processes = []
+				if letter in column.keys():
+					in_column = in_column and (freq[letter] <= column[letter])
+				else:
+					in_column = False
 
-		for position in range(size):
-			processes += [Process(target=solver, args=(row_and_column(matrix, position), find, found))]
-			processes[position].start()
+			if (in_row or in_column):
+				position['found'] += [word]
 
-		for process in processes:
-			process.join()
+# ----------------- MPI
 
-		w = word_counter(found)
+comm = MPI.COMM_WORLD
+size = comm.Get_size()
+rank = comm.Get_rank()
 
-		print(len(w))
-		for word in w:
-			print(word)
+if rank == 0:
+	scatterable = data_preprocessing_root(size)
+else:
+	scatterable = None
+
+# scatter for magic
+scatterable = comm.scatter(scatterable, root=0)
+
+# do the magic
+solver(scatterable)
+
+# gather the magic
+scatterable = comm.gather(scatterable, root=0)
+
+if rank == 0:
+	found = []
+	for position in scatterable:
+		for chunk in position:
+			found += chunk['found']
+
+	found = list(set(found))
+	
+	print(len(found))
+	for word in found:
+		print(word)
+
+else:
+	scatterable = None
