@@ -6,6 +6,7 @@ import sys
 from mpi4py import MPI
 from operator import itemgetter
 from collections import Counter
+from socket import gethostname
 
 def column(m, i):
 	return list(map(itemgetter(i), m))
@@ -75,6 +76,7 @@ else:
 scatterable = comm.scatter(scatterable, root=0)
 
 # do the magic
+print(gethostname())
 solver(scatterable)
 
 # gather the magic
