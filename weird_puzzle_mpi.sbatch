@@ -14,5 +14,5 @@ source env/bin/activate
 pip install -r requirements.txt
 
 echo "-------Inicio de Proceso en mpi Python------"
-prun weird_puzzle.py < testcase.in
+prun weird_puzzle.py < test.in
 echo "-------Fin de Proceso en mpi Python------"
