@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-#SBATCH --partition=piv
+#SBATCH --partition=all
 #SBATCH --job-name=weird_puzzle_py
 #SBATCH --time=10:00
 #SBATCH --output=weird_puzzle_py.%j.out
-#SBATCH --ntasks=5
+#SBATCH --ntasks=10
 #
 
 echo "----------Preparando el entorno-------------"
@@ -14,5 +14,5 @@ source env/bin/activate
 pip install -r requirements.txt
 
 echo "-------Inicio de Proceso en mpi Python------"
-python weird_puzzle.py < test.in
+prun weird_puzzle.py < testcase.in
 echo "-------Fin de Proceso en mpi Python------"
